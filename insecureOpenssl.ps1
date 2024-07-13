@@ -1,9 +1,11 @@
 # Define paths
-$CertDir = "C:\path\to\your\certificate"
+$CertDir = "E:\xampp\apache\conf\domains\dev\certificate"
 $KeyPath = Join-Path $CertDir "private.key"
+$DecryptedKeyPath = Join-Path $CertDir "private_decrypted.key"
 $CertPath = Join-Path $CertDir "server.crt"
-$ConfigPath = "C:\path\to\your\openssl.cnf"
+$ConfigPath = "E:\xampp\apache\conf\domains\dev\openssl.cnf"
 $PassphraseFile = Join-Path $CertDir "passphrase.txt"
+$DecryptedKeyPath = Join-Path $CertDir "private_decrypted.key"
 
 # Function to run OpenSSL commands
 function Invoke-OpenSSL {
@@ -24,9 +26,8 @@ function Get-RandomPassphrase {
     return -join ((1..$length) | ForEach-Object { $characters | Get-Random })
 }
 
-# Check if the certificate directory exists, if not create it
+# Create certificate directory if it doesn't exist
 if (-not (Test-Path $CertDir)) {
-    Write-Host "Creating certificate directory: $CertDir" -ForegroundColor Yellow
     New-Item -ItemType Directory -Path $CertDir | Out-Null
 }
 
@@ -40,25 +41,22 @@ try {
     # Generate and save the passphrase
     $passphrase = Get-RandomPassphrase
     $passphrase | Out-File -FilePath $PassphraseFile -NoNewline
-    Write-Host "Generated passphrase and saved to: $PassphraseFile" -ForegroundColor Green
 
-    # Generate the private key without password
-    Write-Host "Generating private key..."
-    Invoke-OpenSSL "genpkey -algorithm RSA -out `"$KeyPath`""
-
-    # Encrypt the private key with passphrase
-    Write-Host "Encrypting private key..."
-    Invoke-OpenSSL "pkcs8 -topk8 -in `"$KeyPath`" -out `"$KeyPath.enc`" -passout file:`"$PassphraseFile`""
-
-    # Replace the unencrypted key with the encrypted one
-    Move-Item -Path "$KeyPath.enc" -Destination $KeyPath -Force
+    # Generate the private key (encrypted)
+    Write-Host "Generating encrypted private key..."
+    Invoke-OpenSSL "genpkey -algorithm RSA -aes256 -out `"$KeyPath`" -pass file:`"$PassphraseFile`""
 
     # Generate the self-signed certificate
     Write-Host "Generating self-signed certificate..."
     Invoke-OpenSSL "req -new -x509 -key `"$KeyPath`" -out `"$CertPath`" -config `"$ConfigPath`" -extensions req_ext -passin file:`"$PassphraseFile`""
 
-    Write-Host "Private key and certificate have been generated successfully." -ForegroundColor Green
-    Write-Host "Private key: $KeyPath"
+    # Create a decrypted version of the private key for Apache
+    Write-Host "Creating decrypted version of private key for Apache..."
+    Invoke-OpenSSL "rsa -in `"$KeyPath`" -out `"$DecryptedKeyPath`" -passin file:`"$PassphraseFile`""
+
+    Write-Host "Certificate files generated successfully:" -ForegroundColor Green
+    Write-Host "Encrypted private key: $KeyPath"
+    Write-Host "Decrypted private key: $DecryptedKeyPath"
     Write-Host "Certificate: $CertPath"
     Write-Host "Passphrase file: $PassphraseFile"
 }
