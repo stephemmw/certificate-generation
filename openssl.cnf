@@ -1,0 +1,25 @@
+[ req ]
+default_bits       = 2048
+default_keyfile    = private.key
+default_md         = sha256
+prompt             = no
+encrypt_key        = yes
+default_days       = 365
+distinguished_name = dn
+req_extensions     = req_ext
+
+[ dn ]
+C  = US
+ST = State
+L  = City
+O  = Example Company
+OU = IT Department
+CN = example.com
+emailAddress = email@example.com
+
+[ req_ext ]
+subjectAltName = @alt_names
+
+[ alt_names ]
+DNS.1 = example.com
+DNS.2 = *.example.com
